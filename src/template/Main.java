@@ -2,6 +2,8 @@ package template;
 
 import br.com.davidbuzatto.jsge.core.engine.EngineFrame;
 import java.awt.Color;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Stack;
 
 public class Main extends EngineFrame {
@@ -20,10 +22,15 @@ public class Main extends EngineFrame {
     private int tamTela;
 
     private Stack<int[]> caminho;
+
+    private List<int[]> caminhoCompleto;
+
     private boolean resolvido;
 
-    // Para armazenar a direção da seta a ser desenhada
     private int direcaoAtual;
+
+    private int linhaDestino;
+    private int colunaDestino;
 
     public Main() {
         super(800, 800, "Backtracking", 60, true);
@@ -31,7 +38,12 @@ public class Main extends EngineFrame {
 
     @Override
     public void create() {
-        tempoParaMudar = 0.2;
+        caminhoCompleto = new ArrayList<>();
+
+        linhaDestino = 3;
+        colunaDestino = 3;
+
+        tempoParaMudar = 0.05;
         tamTela = getScreenHeight();
         resolvido = false;
 
@@ -60,22 +72,27 @@ public class Main extends EngineFrame {
             contadorTempo += delta;
             if (contadorTempo > tempoParaMudar) {
                 contadorTempo = 0;
-                avancarPasso();
+                avancarPasso(linhaDestino, colunaDestino);
             }
         }
     }
 
-    @Override
-    public void draw() {
-        clearBackground(WHITE);
-        desenharTabuleiro();
+@Override
+public void draw() {
+    clearBackground(WHITE);
+    desenharTabuleiro();
 
-        // Desenhando a seta para a última direção que o algoritmo seguiu
-        if (direcaoAtual != -1) {
-            int[] posicao = caminho.peek();
-            desenharSeta(posicao[0], posicao[1], direcaoAtual);
+    if (direcaoAtual != -1) {
+        int[] posicao = caminho.peek();
+        desenharSeta(posicao[0], posicao[1], direcaoAtual);
+    }
+
+    if (resolvido) {
+        for (int[] passo : caminhoCompleto) {
+            if(passo[2] > -1) desenharSeta(passo[0], passo[1], passo[2]);
         }
     }
+}
 
     private void desenharTabuleiro() {
         Color cor;
@@ -104,15 +121,12 @@ public class Main extends EngineFrame {
         }
     }
 
-    // Novo método para desenhar a seta
     private void desenharSeta(int linha, int coluna, int direcao) {
-        // Definir as coordenadas da seta
         int xStart = coluna * tamTela / 10 + 40;
         int yStart = linha * tamTela / 10 + 40;
         int xEnd = xStart;
         int yEnd = yStart;
 
-        // Baseado na direção, ajustar as coordenadas finais da seta
         switch (direcao) {
             case 0: // Cima
                 yEnd += 20;
@@ -128,8 +142,10 @@ public class Main extends EngineFrame {
                 break;
         }
 
+
         // Desenha a linha da seta
         drawLine(xStart, yStart, xEnd, yEnd, BLACK);
+
         // Desenha a ponta da seta
         double angle = Math.atan2(yEnd - yStart, xEnd - xStart);
         int arrowSize = 10;
@@ -138,12 +154,11 @@ public class Main extends EngineFrame {
         int arrowX2 = (int) (xEnd - arrowSize * Math.cos(angle + Math.PI / 6));
         int arrowY2 = (int) (yEnd - arrowSize * Math.sin(angle + Math.PI / 6));
 
-        // Desenha a ponta da seta
         drawLine(xEnd, yEnd, arrowX1, arrowY1, BLACK);
         drawLine(xEnd, yEnd, arrowX2, arrowY2, BLACK);
     }
 
-    private void avancarPasso() {
+    private void avancarPasso(int linhaFim, int colFim) {
         if (caminho.isEmpty()) {
             resolvido = true;
             return;
@@ -153,11 +168,13 @@ public class Main extends EngineFrame {
         int linha = posicao[0];
         int coluna = posicao[1];
 
-        if (linha == 9 && coluna == 9) {
+        if (linha == linhaFim && coluna == colFim) {
             resolvido = true;
             mazeTable[linha][coluna] = CELULA_FINAL;
             return;
         }
+
+        boolean encontrouCaminho = false;
 
         for (int i = 0; i < 4; i++) {
             int novaLinha = linha + MOV_LINHA[i];
@@ -166,14 +183,19 @@ public class Main extends EngineFrame {
             if (ehValido(novaLinha, novaColuna)) {
                 mazeTable[novaLinha][novaColuna] = CAMINHO_SOLUCAO;
                 caminho.push(new int[]{novaLinha, novaColuna});
-                direcaoAtual = i; // Atualiza a direção que o algoritmo está seguindo
-                return;
+                caminhoCompleto.add(new int[]{linha, coluna, i}); // Caminho correto
+                direcaoAtual = i;
+                encontrouCaminho = true;
+                break;
             }
         }
 
-        mazeTable[linha][coluna] = CAMINHO_LIVRE;
-        caminho.pop();
-        direcaoAtual = -1; // Se o caminho for revertido, resetar a direção
+        if (!encontrouCaminho) {
+            // Se não encontrou caminho, volta atrás (backtrack)
+            mazeTable[linha][coluna] = -1;
+            caminho.pop();
+            direcaoAtual = -1;
+        }
     }
 
     private boolean ehValido(int linha, int coluna) {
